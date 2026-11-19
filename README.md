@@ -1,129 +1,74 @@
-# token-viewer
+# Follow One Sentence
 
-A small Streamlit app that follows **one sentence** through the whole pipeline:
-tokens, embedding, a 2D meaning map, and finally a real vector search compared
-with a keyword search.
+A small Streamlit app that follows **one sentence** through the steps that happen before an AI model can search by meaning: tokens, an embedding, a 2D meaning map, and a vector search shown next to a keyword search.
 
-The page is a single dark, professional theme — deep slate background
-(`#0b0f18`), one indigo accent (`#4f46e5`), light-gray card outlines — with
-entrances and hover effects throughout.
+**Live demo:** https://tokenviewer.streamlit.app/
+*(The first load can take a few seconds while the models start up.)*
 
-```
-text --> tokenizer --> token IDs --> embedding --> vector database --> results
-```
-
-The page is a single dark-themed flow made of five numbered cards:
+![Demo](docs/demo.gif)
+<!-- Add a short GIF or screenshot at docs/demo.gif -->
 
 ```
-1 Input  ->  2 Tokens  ->  3 Embedding  ->  4 Map  ->  5 Search + Recap
+text -> tokenizer -> token IDs -> embedding -> vector database -> results
 ```
 
-A progress stepper at the top (Input · Tokens · Embedding · Map · Search) shows
-where you are. Cards are revealed one at a time with a "Next" button, or all at
-once with the "Show all" toggle. "Start over" and "Try another sentence" reset
-the flow.
+## What you will see
 
-## What each card shows
+The page has five cards. Click "Next" to reveal them one at a time, or use the "Show all" toggle.
 
-**1. Your sentence**
-- Type a sentence, or pick one of three example buttons.
-- "Next: tokenize" reveals the next card.
+| Step | What happens |
+|---|---|
+| 1. Your sentence | Type a sentence or pick an example. |
+| 2. Tokens | The sentence is split into tokens. Choose `gpt2`, `bert-base-uncased` or `cl100k_base`. Each pill shows the token and its ID (`␣` means the token starts with a space). |
+| 3. Embedding | `all-MiniLM-L6-v2` turns the whole sentence into 384 numbers. Blue is negative, white is zero, red is positive. Hover a cell for its value. |
+| 4. Meaning map | About 30 sample sentences and yours are flattened to 2D with PCA and colored by topic (Food, Sports, Technology, Learning). Your sentence is the star. |
+| 5. Search + recap | Search by meaning (ChromaDB, cosine similarity) next to a simple keyword search, plus a recap of the real measured numbers. |
 
-**2. Tokens**
-- Choose a tokenizer: `gpt2`, `bert-base-uncased`, or `cl100k_base`.
-- Tokens appear as colored pills with their IDs; hover a pill for a tooltip.
-- `␣` marks a token that starts with a space.
+Each step has a "Why?" panel with a short explanation.
 
-**3. Embedding**
-- Uses `all-MiniLM-L6-v2` to turn the sentence into 384 numbers.
-- Shown as a heatmap strip: blue = negative, white = zero, red = positive.
-- Hover a cell to see the exact value.
+## Good to know
 
-**4. Meaning map**
-- The 31 sample sentences plus your sentence are reduced to 2D with PCA and
-  plotted, colored by topic (Food, Sports, Technology, Learning).
-- Your sentence is the star; hover a dot to read its sentence.
-- Caption: *"Simplified 2D view. Real embeddings have hundreds of dimensions."*
+- The Tokens card uses three popular tokenizers so you can compare them. The embedding model has its own tokenizer internally, so the token count in the recap comes from the tokenizer you selected, not necessarily the one inside `all-MiniLM-L6-v2`.
+- The embedding card shows one vector for the whole sentence. The model works with a vector per token internally and combines them into this one.
+- This app shows the retrieval side of many AI apps (search and RAG). It does not generate text like a chatbot.
 
-**5. Search + Recap**
-- "By meaning" (ChromaDB, cosine distance) side by side with "By keyword"
-  (simple word overlap). If keywords find nothing, it says
-  "No shared words found".
-- A recap card shows the real measured numbers, for example:
-  `4 tokens → 384 numbers → 3 matches in <0.01 s`
-- Search time is measured with `time.perf_counter`.
-
-Every step also has a "Why?" expander answering one question in two or three
-sentences (token splitting, what the numbers mean, why similar sentences sit
-close together, and why meaning search beats keywords).
-
-Cards fade in and slide up as you advance (each one on its own staggered
-delay), token pills pop in one by one, chart visuals fade in, the active
-stepper dot pulses, buttons lift on hover, and cards lift slightly on hover.
-That "animated way" is the point: you can watch each stage appear.
-
-## Database
-
-- ChromaDB is stored locally in `chroma_db/` (cosine distance).
-- On first run, if the collection is empty, the 31 sample sentences are loaded
-  automatically so the app never starts empty.
-- The "Manage database" expander still lets you reload samples or add your own
-  sentences (one per line). Sample ids are fixed, so reloading does not create
-  duplicates.
-- "Reset database" deletes everything in the collection and reloads the 31
-  sample sentences. A success message appears at the top of the page.
-
-## Install
-
-macOS uses an externally managed Python, so create a virtual environment inside
-the project folder:
+## Run it locally
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-## Run
-
-```bash
 streamlit run app.py
 ```
 
-Then open the URL Streamlit prints (usually `http://localhost:8501`).
+Open the URL Streamlit prints (usually `http://localhost:8501`). The first run downloads the models, so it needs an internet connection. Stop the app with `Ctrl+C`.
 
-To stop the app, press `Ctrl+C` in the terminal.
+## Database
 
-## Theme
+- ChromaDB stores the sentences in a local `chroma_db/` folder using cosine distance.
+- On first run, if the collection is empty, the sample sentences load automatically.
+- Open "Manage database" to reload the samples, add your own sentences (one per line), or reset everything. Deleting the `chroma_db/` folder also resets it.
 
-`.streamlit/config.toml` forces the dark theme:
+## Built with
 
-```toml
-[theme]
-base = "dark"
-primaryColor = "#4f46e5"
-backgroundColor = "#0b0f18"
-secondaryBackgroundColor = "#111727"
-textColor = "#e5e7eb"
-font = "sans serif"
-```
-
-## Models and tools
-
-- `gpt2` — Hugging Face `transformers` AutoTokenizer
-- `bert-base-uncased` — Hugging Face `transformers` AutoTokenizer
-- `cl100k_base` — `tiktoken` (the tokenizer used by GPT-3.5 / GPT-4)
-- `all-MiniLM-L6-v2` — `sentence-transformers` embedding model (384 dimensions)
-- `chromadb` — local vector database (persisted in `chroma_db/`)
-- `plotly` — the embedding strip and the meaning map
+- `transformers` (AutoTokenizer) for `gpt2` and `bert-base-uncased`
+- `tiktoken` for `cl100k_base`
+- `sentence-transformers` with `all-MiniLM-L6-v2` (384 dimensions)
+- `chromadb` for the vector database
+- `scikit-learn` (PCA) and `plotly` for the charts
+- `streamlit` for the interface
 
 ## Limitations
 
-- The sample data is small (15 sentences), so clusters and search results are
-  illustrative rather than representative.
-- PCA flattens 384 dimensions to 2D, so plot distances are only an
-  approximation of real meaning distance.
-- Keyword search only counts exact word overlaps (common words like "the" are
-  ignored), so it misses synonyms and paraphrases by design.
-- Deleting the `chroma_db/` folder resets the database; it will be refilled with
-  the samples on the next run.
+- The sample data is small (about 30 sentences), so the map and search results are illustrative, not representative.
+- PCA flattens 384 dimensions to 2D, so distances on the map only roughly reflect real meaning distance.
+- Keyword search counts exact word overlaps (ignoring common words), so it misses synonyms and paraphrases by design.
+- Similarity scores depend on the embedding model and the sample data. Treat them as a demonstration, not a benchmark.
+
+## Inspiration
+
+Inspired by [Transformer Explainer](https://poloclub.github.io/transformer-explainer/), which visualizes what happens *inside* a model. This project covers the steps before and around it.
+
+## License
+
+Add a license here (for example MIT).
