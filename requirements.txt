@@ -1,0 +1,8 @@
+streamlit
+transformers
+tiktoken
+sentence-transformers
+scikit-learn
+plotly
+numpy
+chromadb
