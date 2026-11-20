@@ -27,7 +27,7 @@ to begin again.
 | 3. Embedding | `all-MiniLM-L6-v2` turns the whole sentence into 384 numbers. Blue is negative, white is zero, red is positive. Hover a cell for its value. |
 | 4. Meaning map | About 30 sample sentences and yours are flattened to 2D with PCA and colored by topic (Food, Sports, Technology, Learning). Your sentence is the star. |
 | 5. Search + recap | Search by meaning (ChromaDB, cosine similarity) next to a simple keyword search, plus a recap of the real measured numbers. |
-| 6. How it works | A visual pipeline of the data flow: Sentence → Tokenizer → Token IDs → Embedding → Vector DB → Search. Plus flow diagrams for the two search paths and the live results. |
+| 6. How it works | A visual pipeline of the data flow: Sentence → Tokenizer → Token IDs → Embedding → Vector DB → Search. Plus flow diagrams for the meaning/keyword search paths, the real search results, the tokenizer comparison (gpt2/bert/cl100k), and the live results. |
 
 Each step has a "Why?" panel with a short explanation.
 

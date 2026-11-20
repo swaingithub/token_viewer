@@ -1,4 +1,5 @@
 import re
+import os
 import time
 import hashlib
 import numpy as np
@@ -184,9 +185,9 @@ st.markdown(
     div[data-testid="stProgress"] { height:0.3rem !important; margin:1px 0; }
     div[class*="st-key-card_search"] strong { font-size:0.98rem; }
     /* Step 6 (how card) with comfortable spacing */
-    div[class*="st-key-card_how"] .flow { margin:0.6rem 0 0.9rem; }
-    div[class*="st-key-card_how"] .stMarkdown { margin:4px 0; }
-    div[class*="st-key-card_how"] .card-desc { margin-top:4px; }
+    div[class*="st-key-card_how"] .flow { margin:0.5rem 0 0.8rem; }
+    div[class*="st-key-card_how"] .stMarkdown { margin:2px 0; }
+    div[class*="st-key-card_how"] .card-desc { margin-top:2px; }
 
     /* Token pills */
     .pill { display:inline-block; padding:8px 15px; margin:6px 8px 6px 0; border-radius:8px; font-weight:600; font-size:14px; color:#111827; font-family:ui-monospace, monospace; border:1px solid rgba(0,0,0,0.10); cursor:help; animation:pillIn 0.5s ease both; transition:transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
@@ -261,6 +262,50 @@ def tokenize(text, tokenizer, name):
         ids = tokenizer.encode(text)
         tokens = tokenizer.convert_ids_to_tokens(ids)
     return list(zip(tokens, ids))
+
+
+def compare_tokenizers(text):
+    """Tokenize `text` with the three available tokenizers to show how they differ."""
+    out = []
+    for name in ["gpt2", "bert-base-uncased", "cl100k_base"]:
+        try:
+            pairs = tokenize(text, load_tokenizer(name), name)
+        except Exception:
+            pairs = []
+        out.append((name, pairs))
+    return out
+
+
+def db_sample_entries(collection, n=3):
+    """Sample stored entries: document text + topic + vector preview."""
+    try:
+        res = collection.get(limit=n, include=["documents", "metadatas", "embeddings"])
+    except Exception:
+        res = collection.get(limit=n, include=["documents", "metadatas"])
+    docs = res["documents"] or []
+    metas = res["metadatas"] or []
+    raw_embs = res.get("embeddings")
+    embs = list(raw_embs) if raw_embs is not None else []
+    entries = []
+    for i, doc in enumerate(docs):
+        emb = embs[i] if i < len(embs) else None
+        vec = emb.tolist() if hasattr(emb, "tolist") else list(emb) if emb is not None else []
+        topic = metas[i].get("topic", "?") if i < len(metas) and metas[i] else "?"
+        entries.append({
+            "doc": doc,
+            "topic": topic,
+            "dim": len(vec),
+            "preview": [round(v, 3) for v in vec[:6]],
+        })
+    return entries
+
+
+def db_disk_files():
+    """List the files on disk in the chroma_db/ directory."""
+    try:
+        return sorted(os.listdir("chroma_db"))
+    except OSError:
+        return []
 
 
 def color_for(token_id):
@@ -769,13 +814,9 @@ if how_visible:
     with how_card:
         if query_embedding is None:
             query_embedding = embed_texts(model, [sentence])[0]
-        if not pairs:
-            _tok = st.session_state.get("tokenizer_select", "gpt2")
-            pairs = tokenize(sentence, load_tokenizer(_tok), _tok)
+
         st.markdown(
-            "The map in Step 4 shows every sentence in 2D — near neighbors on the plot tend to be similar in meaning. "
-            "Everything below is what happens behind that, step by step. All of it runs locally: the tokenizer, "
-            "the embedding model and the ChromaDB database are on your machine.",
+            "All of it runs locally: the tokenizer, the embedding model and the ChromaDB database are on your machine.",
             unsafe_allow_html=True,
         )
 
@@ -801,82 +842,50 @@ if how_visible:
             ], base_delay=0.65),
             unsafe_allow_html=True,
         )
-        results = semantic_search(collection, query_embedding, top_k=3)
+        results = semantic_search(collection, query_embedding, top_k=2)
         if results:
-            for n, (doc, meta, dist) in enumerate(results):
+            for n, (doc, meta, dist) in enumerate(results[:2]):
                 topic = meta.get("topic", "?") if meta else "?"
                 similarity = round(1 - dist, 2)
-                d = 1.7 + n * 0.08
-                st.markdown(
-                    f'<div style="animation:fade 0.4s ease both; animation-delay:{d:.2f}s">'
-                    f"<b>{doc}</b> — {topic} · similarity {similarity:.2f}</div>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f"<b>{doc}</b> — {topic} · similarity {similarity:.2f}", unsafe_allow_html=True)
         else:
             st.caption("No results.")
 
-        st.markdown("**Keyword search flow**", unsafe_allow_html=True)
-        st.markdown(
-            flow_diagram([
-                {"label": "Query words", "highlight": True},
-                {"label": "Document words", "highlight": True},
-                {"label": "Shared words", "sub": "exact matches", "highlight": True},
-            ], base_delay=2.2),
-            unsafe_allow_html=True,
+        st.markdown("**What is a tokenizer? Why is it required?**", unsafe_allow_html=True)
+        st.caption(
+            "AI models read numbers, not words. A tokenizer turns raw text into pieces with an integer ID each — "
+            "the only way a model can learn from any text. Other tokenizers for this sentence: "
+            "gpt2 → I, love, pizza, . · bert-base-uncased → [CLS], i, love, pizza, ., [SEP] · cl100k_base → I, love, pizza, ."
         )
-        docs, metadatas, _ = get_all_sentences(collection)
-        keyword_results = keyword_search(docs, metadatas, sentence, top_k=3)
-        if keyword_results:
-            for n, (overlap, doc, meta) in enumerate(keyword_results):
-                topic = meta.get("topic", "?") if meta else "?"
-                d = 3.1 + n * 0.08
-                st.markdown(
-                    f'<div style="animation:fade 0.4s ease both; animation-delay:{d:.2f}s">'
-                    f"<b>{doc}</b> — {topic} · {overlap} shared word(s)</div>",
-                    unsafe_allow_html=True,
-                )
 
-        st.markdown("**Your sentence, step by step**", unsafe_allow_html=True)
-        st.markdown(f"Sentence: `{sentence}`", unsafe_allow_html=True)
-        if not pairs:
-            pairs = tokenize(sentence, load_tokenizer(tokenizer_name), tokenizer_name)
-        render_tokens(pairs)
-        st.caption("␣ means the token starts with a space.")
-        st.markdown(f"**Total tokens:** {len(pairs)}", unsafe_allow_html=True)
+        st.markdown("**What is the embedding (the 384 numbers)?**", unsafe_allow_html=True)
+        st.caption("The model combines the sentence's tokens into one vector — a list of 384 numbers.")
 
-        vec = np.array(query_embedding if query_embedding is not None else embed_texts(model, [sentence])[0])
-        st.plotly_chart(embedding_figure(vec, height=50), use_container_width=True)
-        st.caption("Your vector as stored in the database — blue = negative, red = positive, hover for the value.")
-        st.caption(f"ChromaDB: {collection.count()} documents, each with its 384-number vector.")
+        st.markdown("**How retrieval works**", unsafe_allow_html=True)
+        st.caption("Similarity = 1 − cosine distance: 0.93 ≈ 93% similar. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `I love pizza.`")
 
-        with st.expander("Why?"):
-            st.markdown("**Why are some words split into pieces?**")
-            st.write(
-                "Tokenizers break text into smaller units so the model can handle rare or long words. "
-                "Common words often stay whole, while less common ones split into pieces. "
-                "A smaller vocabulary keeps the model efficient."
-            )
-        with st.expander("Why?"):
-            st.markdown("**What do these 384 numbers mean?**")
-            st.write(
-                "Each number is one coordinate in a 384-dimension space. "
-                "The model learns coordinates so that sentences with similar meaning land near each other. "
-                "No single number has a simple meaning on its own."
-            )
-        with st.expander("Why?"):
-            st.markdown("**Why do similar sentences sit close together?**")
-            st.write(
-                "The embedding model places sentences so that related meanings share similar coordinates. "
-                "When we flatten those coordinates to 2D, near neighbors on the map tend to be near neighbors in meaning. "
-                "The map is a rough sketch, not an exact distance."
-            )
-        with st.expander("Why?"):
-            st.markdown("**Why did meaning search find results that keywords missed?**")
-            st.write(
-                "Meaning search compares vectors, so it can match paraphrases that share no exact words. "
-                "Keyword search only counts exact word overlaps, so it misses synonyms and rephrasing. "
-                "That is why the two columns can disagree."
-            )
+        with st.expander("How is the vector database created and how is data stored?", expanded=False):
+            st.caption("A vector database is a database specialized for storing vectors (embeddings) and finding the closest ones by meaning. It is created as:")
+            st.code('client = chromadb.PersistentClient(path="chroma_db")\ncollection = client.get_or_create_collection("sentences", metadata={"hnsw:space": "cosine"})', language="python")
+            entries = db_sample_entries(collection, n=1)
+            st.caption(f"Stored in `chroma_db/` — {collection.count()} documents. Example entry: `{entries[0]['doc']}` — {entries[0]['topic']} — vector {entries[0]['preview']} ({entries[0]['dim']} numbers)")
+
+        with st.expander("Silly questions and advanced details", expanded=False):
+            qa = [
+                ("Why is a tokenizer required?",
+                 "AI models read sequences of integers, not words. The tokenizer turns raw text into token IDs that the model understands — it defines the vocabulary the model was trained on."),
+                ("What is a token?",
+                 "A piece of text: a word, part of a word, or a character. Common words usually stay whole; rarer words get split. The ␣ marker means the piece starts with a space."),
+                ("What is the '384' in the embedding?",
+                 "all-MiniLM-L6-v2 is a small transformer whose hidden size is 384: every sentence is compressed into a 384-number vector. That number is fixed by the model's architecture."),
+                ("What is cosine distance?",
+                 "Distance between two vectors measured by the angle between them: 0 = identical direction, 1 = at right angles, 2 = opposite. Similarity = 1 − distance, so 0.93 means 93% similar."),
+                ("Why did meaning search miss a match that keyword search found?",
+                 "Keyword search looks for exact word overlaps. Meaning search compares vectors, so it can find paraphrases sharing no words (e.g. 'the cat sat' → 'the feline rested')."),
+            ]
+            for q, a in qa:
+                st.markdown(f"**{q}**", unsafe_allow_html=True)
+                st.caption(a)
 
 
 # ==================== Manage database ====================
