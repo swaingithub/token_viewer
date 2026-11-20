@@ -14,7 +14,11 @@ text -> tokenizer -> token IDs -> embedding -> vector database -> results
 
 ## What you will see
 
-The page has five cards. Click "Next" to reveal them one at a time, or use the "Show all" toggle.
+The flow is **accordion-style**: the input card is always visible, and each step
+shows one card at a time — clicking "Next" makes the new step card slide in
+right below the input card, and the page never scrolls. Use the "Show all"
+toggle to see every card at once. Click "Start over" or "Try another sentence"
+to begin again.
 
 | Step | What happens |
 |---|---|
@@ -23,8 +27,22 @@ The page has five cards. Click "Next" to reveal them one at a time, or use the "
 | 3. Embedding | `all-MiniLM-L6-v2` turns the whole sentence into 384 numbers. Blue is negative, white is zero, red is positive. Hover a cell for its value. |
 | 4. Meaning map | About 30 sample sentences and yours are flattened to 2D with PCA and colored by topic (Food, Sports, Technology, Learning). Your sentence is the star. |
 | 5. Search + recap | Search by meaning (ChromaDB, cosine similarity) next to a simple keyword search, plus a recap of the real measured numbers. |
+| 6. How it works | A visual pipeline of the data flow: Sentence → Tokenizer → Token IDs → Embedding → Vector DB → Search. Plus flow diagrams for the two search paths and the live results. |
 
 Each step has a "Why?" panel with a short explanation.
+
+## Videos
+
+- `token_viewer_demo.mp4` — the full step-by-step flow: tokens → embedding → map → search + recap → how it works.
+- `token_viewer_behind_the_scenes.mp4` — everything behind the scenes in one window, no scrolling: the pipeline flow (Sentence → Tokenizer → Token IDs → Embedding → Vector DB → Search), the real search results, your sentence's tokens, and the database stats.
+
+## Animations — the app is deliberately animated to feel like learning
+
+- New step cards arrive with a **spring bounce slide-in** and a **ripple pop** around the card ("milestone reach" feel); page titles, subtitles and connector dots fade in as well.
+- Flow diagrams (in the "How it works" card) reveal their boxes and arrows one after another, sliding in from the left.
+- The result lists fade in staggered — the search results, the keyword results, and the real results inside "How it works".
+- Connector lines pulse, and the active stepper dot pulses.
+- Cards already slide up as you advance.
 
 ## Good to know
 
@@ -47,7 +65,7 @@ Open the URL Streamlit prints (usually `http://localhost:8501`). The first run d
 
 - ChromaDB stores the sentences in a local `chroma_db/` folder using cosine distance.
 - On first run, if the collection is empty, the sample sentences load automatically.
-- Open "Manage database" to reload the samples, add your own sentences (one per line), or reset everything. Deleting the `chroma_db/` folder also resets it.
+- Open "Manage database" to reload the samples, add your own sentences (one per line), or reset everything with the "Reset database" button (it deletes everything and reloads the 31 samples). Deleting the `chroma_db/` folder also resets it.
 
 ## Built with
 
