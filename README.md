@@ -31,11 +31,6 @@ to begin again.
 
 Each step has a "Why?" panel with a short explanation.
 
-## Videos
-
-- `token_viewer_demo.mp4` — the full step-by-step flow: tokens → embedding → map → search + recap → how it works.
-- `token_viewer_behind_the_scenes.mp4` — everything behind the scenes in one window, no scrolling: the pipeline flow (Sentence → Tokenizer → Token IDs → Embedding → Vector DB → Search), the real search results, your sentence's tokens, and the database stats.
-
 ## Animations — the app is deliberately animated to feel like learning
 
 - New step cards arrive with a **spring bounce slide-in** and a **ripple pop** around the card ("milestone reach" feel); page titles, subtitles and connector dots fade in as well.
