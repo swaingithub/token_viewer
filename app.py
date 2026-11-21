@@ -1,5 +1,5 @@
 import re
-import os
+import uuid
 import time
 import hashlib
 import numpy as np
@@ -188,6 +188,7 @@ st.markdown(
     div[class*="st-key-card_how"] .flow { margin:0.5rem 0 0.8rem; }
     div[class*="st-key-card_how"] .stMarkdown { margin:2px 0; }
     div[class*="st-key-card_how"] .card-desc { margin-top:2px; }
+    div[class*="st-key-card_how"] .st-emotion-cache-16e36jh { font-size:0.95rem; color:#cfd8e5; }
 
     /* Token pills */
     .pill { display:inline-block; padding:8px 15px; margin:6px 8px 6px 0; border-radius:8px; font-weight:600; font-size:14px; color:#111827; font-family:ui-monospace, monospace; border:1px solid rgba(0,0,0,0.10); cursor:help; animation:pillIn 0.5s ease both; transition:transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
@@ -300,14 +301,6 @@ def db_sample_entries(collection, n=3):
     return entries
 
 
-def db_disk_files():
-    """List the files on disk in the chroma_db/ directory."""
-    try:
-        return sorted(os.listdir("chroma_db"))
-    except OSError:
-        return []
-
-
 def color_for(token_id):
     """Pick a soft pastel pill color from the token id."""
     r = 200 + (token_id * 37) % 55
@@ -350,10 +343,18 @@ def get_sample_embeddings():
 
 # --- ChromaDB ---
 @st.cache_resource
+def get_chroma_client():
+    """Get or create a per-visitor in-memory ChromaDB client (EphemeralClient)."""
+    return chromadb.EphemeralClient()
+
+
 def get_chroma_collection():
-    """Get or create the 'sentences' collection with cosine distance."""
-    client = chromadb.PersistentClient(path="chroma_db")
-    return client.get_or_create_collection(name="sentences", metadata={"hnsw:space": "cosine"})
+    """Get or create this visitor's collection with cosine distance."""
+    client = get_chroma_client()
+    return client.get_or_create_collection(
+        name=st.session_state["visitor_collection_name"],
+        metadata={"hnsw:space": "cosine"},
+    )
 
 
 def load_samples_into_chroma(collection, model):
@@ -408,20 +409,27 @@ def semantic_search(collection, query_embedding, top_k=3):
 STOPWORDS = {
     "a", "an", "the", "is", "are", "was", "were", "i", "you", "it", "to", "of",
     "and", "or", "in", "on", "for", "with", "my", "me", "we", "us", "be", "at",
+    "so", "much", "very", "this", "that", "but", "if", "as", "do",
 }
 
 
 def keyword_search(documents, metadatas, query, top_k=3):
-    """Simple word-overlap search that ignores common filler words."""
+    """Word-overlap search that ignores common filler words.
+
+    Returns (overlap, doc, meta, matched_words) tuples, sorted by overlap desc.
+    """
     query_words = set(re.findall(r"\w+", query.lower())) - STOPWORDS
     if not query_words:
         return []
+    ordered_query_words = [w for w in dict.fromkeys(re.findall(r"\w+", query.lower()))
+                           if w not in STOPWORDS]
     scored = []
     for doc, meta in zip(documents, metadatas):
         doc_words = set(re.findall(r"\w+", doc.lower())) - STOPWORDS
-        overlap = len(query_words & doc_words)
+        matched = [w for w in ordered_query_words if w in doc_words]
+        overlap = len(matched)
         if overlap > 0:
-            scored.append((overlap, doc, meta))
+            scored.append((overlap, doc, meta, matched))
     scored.sort(key=lambda x: x[0], reverse=True)
     return scored[:top_k]
 
@@ -530,6 +538,8 @@ if "step" not in st.session_state:
     st.session_state.step = 0
 if "sentence_input" not in st.session_state:
     st.session_state.sentence_input = "I love pizza."
+if "visitor_collection_name" not in st.session_state:
+    st.session_state.visitor_collection_name = f"visitor-{uuid.uuid4().hex[:8]}"
 
 # Deferred resets run before any widget is created (safe to touch widget keys).
 if st.session_state.pop("do_try_another", False):
@@ -621,7 +631,8 @@ if tokens_visible:
             st.write(
                 "Tokenizers break text into smaller units so the model can handle rare or long words. "
                 "Common words often stay whole, while less common ones split into pieces. "
-                "A smaller vocabulary keeps the model efficient."
+                "Vocabulary size is a trade-off: a bigger vocabulary usually means fewer tokens per sentence, "
+                "but a larger table to store."
             )
 
         if not show_all and step == 1:
@@ -766,12 +777,14 @@ if search_visible:
         with col_keyword:
             st.markdown("**By keyword**")
             if keyword_results:
-                for n, (overlap, doc, meta) in enumerate(keyword_results):
+                for n, (overlap, doc, meta, words) in enumerate(keyword_results):
                     topic = meta.get("topic", "?") if meta else "?"
+                    word_list = ", ".join(f"'{w}'" for w in words)
+                    word_noun = "word" if len(words) == 1 else "words"
                     d = 0.15 + n * 0.07
                     st.markdown(
                         f'<div style="animation:fade 0.4s ease both; animation-delay:{d:.2f}s">'
-                        f'<b>{doc}</b> — {topic} · {overlap} shared word(s)</div>',
+                        f'<b>{doc}</b> — {topic} · {overlap} shared {word_noun}: {word_list}</div>',
                         unsafe_allow_html=True,
                     )
             else:
@@ -816,7 +829,7 @@ if how_visible:
             query_embedding = embed_texts(model, [sentence])[0]
 
         st.markdown(
-            "All of it runs locally: the tokenizer, the embedding model and the ChromaDB database are on your machine.",
+            "Everything runs inside this app. No external AI service is called.",
             unsafe_allow_html=True,
         )
 
@@ -853,22 +866,33 @@ if how_visible:
 
         st.markdown("**What is a tokenizer? Why is it required?**", unsafe_allow_html=True)
         st.caption(
-            "AI models read numbers, not words. A tokenizer turns raw text into pieces with an integer ID each — "
-            "the only way a model can learn from any text. Other tokenizers for this sentence: "
-            "gpt2 → I, love, pizza, . · bert-base-uncased → [CLS], i, love, pizza, ., [SEP] · cl100k_base → I, love, pizza, ."
+            "A tokenizer turns raw text into pieces with an integer ID each — the only way a model can learn from any text."
         )
 
         st.markdown("**What is the embedding (the 384 numbers)?**", unsafe_allow_html=True)
         st.caption("The model combines the sentence's tokens into one vector — a list of 384 numbers.")
 
         st.markdown("**How retrieval works**", unsafe_allow_html=True)
-        st.caption("Similarity = 1 − cosine distance: 0.93 ≈ 93% similar. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `I love pizza.`")
+        if results:
+            top_doc, top_meta, top_dist = results[0]
+            top_sim = round(1 - top_dist, 2)
+            st.caption(
+                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence}`. Top match: `{top_doc}` — similarity {top_sim:.2f}."
+            )
+        else:
+            st.caption(
+                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence}`."
+            )
 
         with st.expander("How is the vector database created and how is data stored?", expanded=False):
-            st.caption("A vector database is a database specialized for storing vectors (embeddings) and finding the closest ones by meaning. It is created as:")
-            st.code('client = chromadb.PersistentClient(path="chroma_db")\ncollection = client.get_or_create_collection("sentences", metadata={"hnsw:space": "cosine"})', language="python")
+            st.caption("A vector database is a database specialized for storing vectors (embeddings) and finding the closest ones by meaning. It is created in memory for this visitor as:")
+            st.code('client = chromadb.EphemeralClient()\ncollection = client.get_or_create_collection("visitor-<your-session>", metadata={"hnsw:space": "cosine"})', language="python")
             entries = db_sample_entries(collection, n=1)
-            st.caption(f"Stored in `chroma_db/` — {collection.count()} documents. Example entry: `{entries[0]['doc']}` — {entries[0]['topic']} — vector {entries[0]['preview']} ({entries[0]['dim']} numbers)")
+            if entries:
+                e = entries[0]
+                st.caption(f"Stored in this visitor's session — {collection.count()} documents. Example entry: `{e['doc']}` — {e['topic']} — vector {e['preview']} ({e['dim']} numbers)")
+            else:
+                st.caption(f"Stored in this visitor's session — {collection.count()} documents.")
 
         with st.expander("Silly questions and advanced details", expanded=False):
             qa = [
@@ -880,8 +904,8 @@ if how_visible:
                  "all-MiniLM-L6-v2 is a small transformer whose hidden size is 384: every sentence is compressed into a 384-number vector. That number is fixed by the model's architecture."),
                 ("What is cosine distance?",
                  "Distance between two vectors measured by the angle between them: 0 = identical direction, 1 = at right angles, 2 = opposite. Similarity = 1 − distance, so 0.93 means 93% similar."),
-                ("Why did meaning search miss a match that keyword search found?",
-                 "Keyword search looks for exact word overlaps. Meaning search compares vectors, so it can find paraphrases sharing no words (e.g. 'the cat sat' → 'the feline rested')."),
+                ("Why can meaning search find matches that keyword search misses?",
+                 "Keyword search matches exact words — names, codes and rare terms are usually better matched there. Meaning search compares vectors, so it can find paraphrases that share no exact words (e.g. 'the cat sat' → 'the feline rested')."),
             ]
             for q, a in qa:
                 st.markdown(f"**{q}**", unsafe_allow_html=True)

@@ -63,9 +63,9 @@ Open the URL Streamlit prints (usually `http://localhost:8501`). The first run d
 
 ## Database
 
-- ChromaDB stores the sentences in a local `chroma_db/` folder using cosine distance.
+- ChromaDB stores the sentences in a per-visitor in-memory database (`chromadb.EphemeralClient()`, cosine distance) — nothing is shared between visitors or written to disk.
 - On first run, if the collection is empty, the sample sentences load automatically.
-- Open "Manage database" to reload the samples, add your own sentences (one per line), or reset everything with the "Reset database" button (it deletes everything and reloads the 31 samples). Deleting the `chroma_db/` folder also resets it.
+- Open "Manage database" to reload the samples, add your own sentences (one per line), or reset everything with the "Reset database" button (it deletes everything and reloads the 31 samples for this visitor).
 
 ## Built with
 
