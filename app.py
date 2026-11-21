@@ -198,6 +198,15 @@ st.markdown(
     /* Buttons */
     .stButton>button { background:var(--accent); border:1px solid var(--accent) !important; color:#fff !important; border-radius:8px; font-weight:600; transition:transform 0.18s, box-shadow 0.2s, filter 0.2s; }
     .stButton>button:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(79,70,229,0.3); }
+    /* Input-card example sentences read as lighter outlined buttons; the "Next" buttons in the flow cards stay solid, so they stand out. */
+    div[class*="st-key-card_input"] button,
+    div[class*="st-key-card_input"] button:hover {
+        background:transparent !important;
+        color:var(--accent) !important;
+        border:2px solid var(--accent) !important;
+        box-shadow:none !important;
+        font-weight:600;
+    }
     /* Charts fade in when they appear */
     div[data-testid="stPlotlyChart"] { animation:fade 0.8s ease both; }
     </style>
@@ -538,6 +547,7 @@ show_all = bool(st.session_state.get("show_all", False))
 # ==================== Top: stepper & controls ====================
 
 render_stepper(step, show_all)
+st.markdown('<div class="subtitle">Type a sentence, click Next, and watch what happens before an AI "understands" it.</div>', unsafe_allow_html=True)
 
 ctrl1, ctrl2 = st.columns([1, 1])
 with ctrl1:
@@ -552,6 +562,7 @@ with ctrl2:
 
 input_card = card(1, "Your sentence", "Type a sentence, or pick an example to start.", "card_input")
 with input_card:
+    st.caption("Analogy: the sentence is like an instruction you hand to a librarian — your words, written down.")
     ex1, ex2, ex3 = st.columns(3)
     if ex1.button("I love pizza.", use_container_width=True):
         st.session_state.sentence_input = "I love pizza."
@@ -566,6 +577,14 @@ with input_card:
 
 # Load shared resources once.
 model = load_embedding_model()
+
+# Preload the tokenizers so the first "Next" transition is instant.
+for _tok_name in ["gpt2", "bert-base-uncased", "cl100k_base"]:
+    try:
+        load_tokenizer(_tok_name)
+    except Exception:
+        pass
+
 collection = get_chroma_collection()
 count = collection.count()
 
@@ -584,9 +603,13 @@ search_visible = show_all or step == 4
 pairs = []
 query_embedding = None
 
+# Pre-compute the embedding for the default sentence so the first "Next" is instant.
+query_embedding = embed_texts(model, [sentence])[0]
+
 # Reveal button after the input card.
 if not show_all and step == 0:
     if st.button("Next: tokenize", type="primary"):
+        st.toast("Loading the next step…", icon="⏳")
         st.session_state.step = 1
         st.rerun()
 
@@ -597,6 +620,8 @@ if tokens_visible:
     connector()
     tokens_card = card(2, "Tokens", "Your sentence split into pieces by a tokenizer.", "card_tokens")
     with tokens_card:
+        st.caption("Analogy: a token is like a syllable — a small piece the model reads.")
+        st.markdown("[View code](https://github.com/swaingithub/token_viewer/blob/main/app.py)")
         tokenizer_name = st.selectbox("Tokenizer", ["gpt2", "bert-base-uncased", "cl100k_base"], key="tokenizer_select")
         try:
             pairs = tokenize(sentence, load_tokenizer(tokenizer_name), tokenizer_name)
@@ -617,6 +642,7 @@ if tokens_visible:
 
         if not show_all and step == 1:
             if st.button("Next: embed", type="primary"):
+                st.toast("Loading the next step…", icon="⏳")
                 st.session_state.step = 2
                 st.rerun()
 
@@ -629,6 +655,8 @@ if embed_visible:
 
     embed_card = card(3, "Embedding", "One list of numbers that captures the meaning of your sentence.", "card_embedding")
     with embed_card:
+        st.caption("Analogy: the embedding is like a fingerprint of the sentence's meaning.")
+        st.markdown("[View code](https://github.com/swaingithub/token_viewer/blob/main/app.py)")
         st.plotly_chart(embedding_figure(query_embedding), use_container_width=True)
         st.caption("Blue = negative, white = zero, red = positive. Hover a cell to see its value.")
 
@@ -642,6 +670,7 @@ if embed_visible:
 
         if not show_all and step == 2:
             if st.button("Next: map", type="primary"):
+                st.toast("Loading the next step…", icon="⏳")
                 st.session_state.step = 3
                 st.rerun()
 
@@ -652,6 +681,8 @@ if map_visible:
     connector()
     map_card = card(4, "Meaning map", "A flat view of where sentences sit in meaning space.", "card_map")
     with map_card:
+        st.caption("Analogy: the map is like a mood board of where similar sentences live.")
+        st.markdown("[View code](https://github.com/swaingithub/token_viewer/blob/main/app.py)")
         if query_embedding is None:
             query_embedding = embed_texts(model, [sentence])[0]
         sample_embeddings = get_sample_embeddings()
@@ -709,6 +740,7 @@ if map_visible:
 
         if not show_all and step == 3:
             if st.button("Next: search", type="primary"):
+                st.toast("Loading the next step…", icon="⏳")
                 st.session_state.step = 4
                 st.rerun()
 
@@ -736,6 +768,8 @@ if search_visible:
 
     search_card = card(5, "Search", "Find the closest sentences by meaning, next to a keyword search.", "card_search")
     with search_card:
+        st.caption("Analogy: the search is like calling a friend who knows the closest sentences.")
+        st.markdown("[View code](https://github.com/swaingithub/token_viewer/blob/main/app.py)")
         st.markdown("#### You just ran a tiny semantic search engine.")
 
         col_meaning, col_keyword = st.columns(2)
@@ -748,7 +782,7 @@ if search_visible:
                     d = 0.15 + n * 0.07
                     st.markdown(
                         f'<div style="animation:fade 0.4s ease both; animation-delay:{d:.2f}s">'
-                        f'<b>{doc}</b> — {topic} · similarity {similarity:.2f}</div>',
+                        f'<b>{doc}</b> — {topic} · similarity score (0 to 1): {similarity:.2f}</div>',
                         unsafe_allow_html=True,
                     )
             else:
@@ -789,6 +823,7 @@ if search_visible:
             next_col, try_col = st.columns([1.3, 1])
             with next_col:
                 if not show_all and step == 4 and st.button("Next: how it works", type="primary"):
+                    st.toast("Loading the next step…", icon="⏳")
                     st.session_state.step = 5
                     st.rerun()
             with try_col:
@@ -805,6 +840,7 @@ if how_visible:
     connector()
     how_card = card(6, "How it works", "The pipeline behind your sentence, visualized.", "card_how")
     with how_card:
+        st.markdown("[View code](https://github.com/swaingithub/token_viewer/blob/main/app.py)")
         if query_embedding is None:
             query_embedding = embed_texts(model, [sentence])[0]
 
@@ -840,7 +876,7 @@ if how_visible:
             for n, (doc, meta, dist) in enumerate(results[:2]):
                 topic = meta.get("topic", "?") if meta else "?"
                 similarity = round(1 - dist, 2)
-                st.markdown(f"<b>{doc}</b> — {topic} · similarity {similarity:.2f}", unsafe_allow_html=True)
+                st.markdown(f"<b>{doc}</b> — {topic} · similarity score (0 to 1): {similarity:.2f}", unsafe_allow_html=True)
         else:
             st.caption("No results.")
 
@@ -857,7 +893,7 @@ if how_visible:
             top_doc, top_meta, top_dist = results[0]
             top_sim = round(1 - top_dist, 2)
             st.caption(
-                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence}`. Top match: `{top_doc}` — similarity {top_sim:.2f}."
+                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence}`. Top match: `{top_doc}` — similarity score (0 to 1): {top_sim:.2f}."
             )
         else:
             st.caption(
@@ -883,7 +919,7 @@ if how_visible:
                 ("What is the '384' in the embedding?",
                  "all-MiniLM-L6-v2 is a small transformer whose hidden size is 384: every sentence is compressed into a 384-number vector. That number is fixed by the model's architecture."),
                 ("What is cosine distance?",
-                 "Distance between two vectors measured by the angle between them: 0 = identical direction, 1 = at right angles, 2 = opposite. Similarity = 1 − distance, so 0.93 means 93% similar."),
+                 "Distance between two vectors measured by the angle between them: 0 = identical direction, 1 = at right angles, 2 = opposite. Similarity = 1 − distance — similarity score (0 to 1); 0.93 means very close."),
                 ("Why can meaning search find matches that keyword search misses?",
                  "Keyword search matches exact words — names, codes and rare terms are usually better matched there. Meaning search compares vectors, so it can find paraphrases that share no exact words (e.g. 'the cat sat' → 'the feline rested')."),
             ]
@@ -894,7 +930,7 @@ if how_visible:
         with st.expander("Beginner's guide: what is this, and how does it work?", expanded=False):
             bq = [
                 ("What is this app?",
-                 "A search machine that runs entirely on your machine: type a sentence, it stores it, and searches by meaning — no internet service, no accounts, nothing sent anywhere."),
+                 "Everything runs inside this app. No external AI service is called."),
                 ("What is a tokenizer, and why is it required?",
                  "AI models read numbers, not words. Before anything else, the tokenizer turns the raw text into small pieces called tokens and gives each piece a number (its ID). That's the only way the model can learn from any text — without a tokenizer there is nothing to feed the model."),
                 ("What is the embedding — what's in AI?",
@@ -902,7 +938,7 @@ if how_visible:
                 ("What is the vector database?",
                  "It's a database specialized for storing vectors (embeddings) and finding the closest ones by meaning. In this app it lives in the visitor's memory — it's not on disk."),
                 ("What is cosine similarity?",
-                 "A way to measure how close two vectors are, using the angle between them: 0 = same direction (identical meaning), 1 = at right angles (unrelated), 2 = opposite. Similarity = 1 − distance, so 0.93 means the result is 93% similar."),
+                 "A way to measure how close two vectors are, using the angle between them: 0 = same direction (identical meaning), 1 = at right angles (unrelated), 2 = opposite. Similarity = 1 − distance — similarity score (0 to 1); 0.93 means very close."),
                 ("What is meaning search, and how is it different from keyword search?",
                  "Keyword search matches the exact words you typed. Meaning search compares vectors, so it can find matches that share no exact words at all — paraphrases with the same meaning. That's why the two columns can disagree."),
                 ("What is the meaning map?",
