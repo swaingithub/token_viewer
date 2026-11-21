@@ -188,7 +188,7 @@ st.markdown(
     div[class*="st-key-card_how"] .flow { margin:0.5rem 0 0.8rem; }
     div[class*="st-key-card_how"] .stMarkdown { margin:2px 0; }
     div[class*="st-key-card_how"] .card-desc { margin-top:2px; }
-    div[class*="st-key-card_how"] .st-emotion-cache-16e36jh { font-size:0.95rem; color:#cfd8e5; }
+    div[class*="st-key-card_how"] .st-emotion-cache-16e36jh { font-size:1rem; color:#e5e7eb; }
 
     /* Token pills */
     .pill { display:inline-block; padding:8px 15px; margin:6px 8px 6px 0; border-radius:8px; font-weight:600; font-size:14px; color:#111827; font-family:ui-monospace, monospace; border:1px solid rgba(0,0,0,0.10); cursor:help; animation:pillIn 0.5s ease both; transition:transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
@@ -261,6 +261,16 @@ def clean_token(token):
     """Turn a raw token into readable text (GPT-2 marks spaces with 'Ġ')."""
     token = token.replace("Ġ", " ").replace("Ċ", "↵")
     return token.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def similarity_bar(similarity, width_px=110, thickness=8):
+    """Horizontal bar whose width reflects the similarity score (scanable at a glance)."""
+    pct = max(0.0, min(100.0, float(similarity) * 100))
+    return (
+        f'<span style="display:inline-block;width:{width_px}px;height:{thickness}px;border-radius:4px;'
+        f'background:var(--line);overflow:hidden;vertical-align:middle;margin-right:8px">'
+        f'<span style="display:block;height:100%;width:{pct}%;background:var(--accent);border-radius:4px"></span></span>'
+    )
 
 
 def tokenize(text, tokenizer, name):
@@ -620,7 +630,7 @@ if tokens_visible:
     connector()
     tokens_card = card(2, "Tokens", "Your sentence split into pieces by a tokenizer.", "card_tokens")
     with tokens_card:
-        st.caption("Analogy: a token is like a syllable — a small piece the model reads.")
+        st.caption("Analogy: a token is like a Lego brick of text — small pieces the model reads (not always a syllable).")
         st.markdown("[View code](https://github.com/swaingithub/token_viewer/blob/main/app.py)")
         tokenizer_name = st.selectbox("Tokenizer", ["gpt2", "bert-base-uncased", "cl100k_base"], key="tokenizer_select")
         try:
@@ -628,6 +638,12 @@ if tokens_visible:
             render_tokens(pairs)
             st.caption("␣ means the token starts with a space. Hover a pill to see its ID.")
             st.markdown(f"**Total tokens:** {len(pairs)}")
+            comp_desc = " · ".join(
+                f"{name}: {' '.join(clean_token(t) for t, _ in toks[:8]) or '—'}"
+                for name, toks in compare_tokenizers(sentence) if toks
+            )
+            if comp_desc:
+                st.caption(f"Other tokenizers: {comp_desc}")
         except Exception as e:
             st.error(f"Could not load tokenizer '{tokenizer_name}': {e}")
 
@@ -781,8 +797,8 @@ if search_visible:
                     similarity = round(1 - dist, 2)
                     d = 0.15 + n * 0.07
                     st.markdown(
-                        f'<div style="animation:fade 0.4s ease both; animation-delay:{d:.2f}s">'
-                        f'<b>{doc}</b> — {topic} · similarity score (0 to 1): {similarity:.2f}</div>',
+                        f'<div style="display:flex;align-items:center;gap:8px;animation:fade 0.4s ease both; animation-delay:{d:.2f}s">'
+                        f'{similarity_bar(similarity)}<b>{doc}</b> — {topic} · similarity score (higher = closer): {similarity:.2f}</div>',
                         unsafe_allow_html=True,
                     )
             else:
@@ -876,7 +892,10 @@ if how_visible:
             for n, (doc, meta, dist) in enumerate(results[:2]):
                 topic = meta.get("topic", "?") if meta else "?"
                 similarity = round(1 - dist, 2)
-                st.markdown(f"<b>{doc}</b> — {topic} · similarity score (0 to 1): {similarity:.2f}", unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:8px">{similarity_bar(similarity)}<b>{doc}</b> — {topic} · similarity score (higher = closer): {similarity:.2f}</div>',
+                    unsafe_allow_html=True,
+                )
         else:
             st.caption("No results.")
 
@@ -893,11 +912,11 @@ if how_visible:
             top_doc, top_meta, top_dist = results[0]
             top_sim = round(1 - top_dist, 2)
             st.caption(
-                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence}`. Top match: `{top_doc}` — similarity score (0 to 1): {top_sim:.2f}."
+                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence.rstrip('.')}`. Top match: `{top_doc}` — similarity score (higher = closer): {top_sim:.2f}."
             )
         else:
             st.caption(
-                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence}`."
+                f"Similarity = 1 − cosine distance. ChromaDB returns the closest by meaning; keyword search counts exact word overlaps. Your sentence: `{sentence.rstrip('.')}`."
             )
 
         with st.expander("How is the vector database created and how is data stored?", expanded=False):
@@ -919,7 +938,7 @@ if how_visible:
                 ("What is the '384' in the embedding?",
                  "all-MiniLM-L6-v2 is a small transformer whose hidden size is 384: every sentence is compressed into a 384-number vector. That number is fixed by the model's architecture."),
                 ("What is cosine distance?",
-                 "Distance between two vectors measured by the angle between them: 0 = identical direction, 1 = at right angles, 2 = opposite. Similarity = 1 − distance — similarity score (0 to 1); 0.93 means very close."),
+                 "Distance between two vectors measured by the angle between them: 0 = identical direction, 1 = at right angles, 2 = opposite. Similarity = 1 − distance — similarity score (higher = closer); 0.93 means very close."),
                 ("Why can meaning search find matches that keyword search misses?",
                  "Keyword search matches exact words — names, codes and rare terms are usually better matched there. Meaning search compares vectors, so it can find paraphrases that share no exact words (e.g. 'the cat sat' → 'the feline rested')."),
             ]
@@ -938,7 +957,7 @@ if how_visible:
                 ("What is the vector database?",
                  "It's a database specialized for storing vectors (embeddings) and finding the closest ones by meaning. In this app it lives in the visitor's memory — it's not on disk."),
                 ("What is cosine similarity?",
-                 "A way to measure how close two vectors are, using the angle between them: 0 = same direction (identical meaning), 1 = at right angles (unrelated), 2 = opposite. Similarity = 1 − distance — similarity score (0 to 1); 0.93 means very close."),
+                 "A way to measure how close two vectors are, using the angle between them: 0 = same direction (identical meaning), 1 = at right angles (unrelated), 2 = opposite. Similarity = 1 − distance — similarity score (higher = closer); 0.93 means very close."),
                 ("What is meaning search, and how is it different from keyword search?",
                  "Keyword search matches the exact words you typed. Meaning search compares vectors, so it can find matches that share no exact words at all — paraphrases with the same meaning. That's why the two columns can disagree."),
                 ("What is the meaning map?",
