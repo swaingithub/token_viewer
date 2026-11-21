@@ -88,19 +88,19 @@ st.markdown(
        (marker div.theme-light rendered by the app; see body:has below). */
     body:has(div.theme-light),
     body:has(div.theme-light) .stApp {
-      color: #111827;
+      color: #1f2937;
       color-scheme: light;
-      --bg:#f5f7fa;
+      --bg:#f5f5f5;
       --surface:#ffffff;
-      --surface-2:#f3f4f6;
-      --surface-3:#eceef2;
-      --line:#dfe1e6;
-      --text:#111827;
-      --text-dim:#4b5563;
-      --text-muted:#6b7280;
+      --surface-2:#f9fafb;
+      --surface-3:#f3f4f6;
+      --line:#e5e7eb;
+      --text:#1f2937;
+      --text-dim:#6b7280;
+      --text-muted:#9ca3af;
       --accent:#4f46e5;
       --accent-hover:#4338ca;
-      --accent-soft:rgba(79,70,229,0.16);
+      --accent-soft:rgba(79,70,229,0.14);
     }
     body, .stApp { background:var(--bg); }
     .block-container { padding-top:2rem; padding-bottom:2.5rem; max-width:900px; margin:0 auto; }
