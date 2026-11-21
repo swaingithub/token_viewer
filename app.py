@@ -911,6 +911,33 @@ if how_visible:
                 st.markdown(f"**{q}**", unsafe_allow_html=True)
                 st.caption(a)
 
+        with st.expander("Beginner's guide: what is this, and how does it work?", expanded=False):
+            bq = [
+                ("What is this app?",
+                 "A search machine that runs entirely on your machine: type a sentence, it stores it, and searches by meaning — no internet service, no accounts, nothing sent anywhere."),
+                ("What is a tokenizer, and why is it required?",
+                 "AI models read numbers, not words. Before anything else, the tokenizer turns the raw text into small pieces called tokens and gives each piece a number (its ID). That's the only way the model can learn from any text — without a tokenizer there is nothing to feed the model."),
+                ("What is the embedding — what's in AI?",
+                 "The model combines the tokens into one list of 384 numbers — the 'embedding'. In AI terms: the model is a large network that has read a lot of text; it has learned to map words and sentences into this number space so that similar meanings land in similar places. No single number has a clear meaning on its own — the whole list encodes the meaning."),
+                ("What is the vector database?",
+                 "It's a database specialized for storing vectors (embeddings) and finding the closest ones by meaning. In this app it lives in the visitor's memory — it's not on disk."),
+                ("What is cosine similarity?",
+                 "A way to measure how close two vectors are, using the angle between them: 0 = same direction (identical meaning), 1 = at right angles (unrelated), 2 = opposite. Similarity = 1 − distance, so 0.93 means the result is 93% similar."),
+                ("What is meaning search, and how is it different from keyword search?",
+                 "Keyword search matches the exact words you typed. Meaning search compares vectors, so it can find matches that share no exact words at all — paraphrases with the same meaning. That's why the two columns can disagree."),
+                ("What is the meaning map?",
+                 "The map is a flat 2D sketch: each dot is a stored sentence, placed by similarity. Dots that are near each other are usually near in meaning — a rough visual of what the numbers mean."),
+                ("What is training?",
+                 "Training is when the model reads enormous amounts of text and learns the number coordinates (embeddings) that put similar meanings near each other. That's why the app can search by meaning instead of by words."),
+                ("What is the POV of AI — how does AI see meaning?",
+                 "AI doesn't see words the way you do — it only sees numbers. 'Meaning', for the model, is a pattern of numbers in the 384-number space: the model has learned which combinations of numbers tend to appear together for similar meanings. When the app says two sentences are similar, it means their number patterns are close in this learned space."),
+                ("Why is any of this required?",
+                 "Because the model speaks numbers, not words. Every step in this pipeline — tokenizing, embedding, searching — exists to convert between the human world of words and the machine world of numbers, so the app can find sentences by meaning."),
+            ]
+            for q, a in bq:
+                st.markdown(f"**{q}**", unsafe_allow_html=True)
+                st.caption(a)
+
 
 # ==================== Manage database ====================
 
