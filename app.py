@@ -84,6 +84,24 @@ st.markdown(
       --surface-3:#1a2540;
     }
     :root { color-scheme: dark; }
+    /* Light ("day") palette — active when the Light mode toggle is on
+       (marker div.theme-light rendered by the app; see body:has below). */
+    body:has(div.theme-light),
+    body:has(div.theme-light) .stApp {
+      color: #111827;
+      color-scheme: light;
+      --bg:#f5f7fa;
+      --surface:#ffffff;
+      --surface-2:#f3f4f6;
+      --surface-3:#eceef2;
+      --line:#dfe1e6;
+      --text:#111827;
+      --text-dim:#4b5563;
+      --text-muted:#6b7280;
+      --accent:#4f46e5;
+      --accent-hover:#4338ca;
+      --accent-soft:rgba(79,70,229,0.16);
+    }
     body, .stApp { background:var(--bg); }
     .block-container { padding-top:2rem; padding-bottom:2.5rem; max-width:900px; margin:0 auto; }
     .stApp { font-family:'Inter', system-ui, -apple-system, sans-serif; }
@@ -559,13 +577,19 @@ show_all = bool(st.session_state.get("show_all", False))
 
 render_stepper(step, show_all)
 
-ctrl1, ctrl2 = st.columns([1, 1])
+ctrl1, ctrl2, ctrl3 = st.columns([1, 1, 1])
 with ctrl1:
     if st.button("Start over", use_container_width=True):
         st.session_state.do_start_over = True
         st.rerun()
 with ctrl2:
+    st.toggle("Light mode", key="theme_light")
+with ctrl3:
     st.toggle("Show all", key="show_all")
+
+# Light ("day") theme marker: the CSS uses body:has(div.theme-light).
+if st.session_state.get("theme_light", False):
+    st.html('<div class="theme-light" aria-hidden="true"></div>')
 
 
 # ==================== Step 1: Input ====================
