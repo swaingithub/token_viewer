@@ -367,26 +367,6 @@ def load_samples_into_chroma(collection, model):
     return len(docs)
 
 
-def reset_database(collection, model):
-    """Delete every document in the collection, then reload the samples."""
-    _, _, ids = get_all_sentences(collection)
-    if ids:
-        collection.delete(ids=ids)
-    load_samples_into_chroma(collection, model)
-    return collection.count()
-
-
-def add_user_sentences(collection, model, sentences):
-    """Add the user's sentences to Chroma with stable ids."""
-    sentences = [s.strip() for s in sentences if s.strip()]
-    if not sentences:
-        return 0
-    ids = ["user-" + hashlib.md5(s.lower().encode()).hexdigest() for s in sentences]
-    metadatas = [{"topic": "User"} for _ in sentences]
-    collection.upsert(documents=sentences, ids=ids, embeddings=embed_texts(model, sentences), metadatas=metadatas)
-    return len(sentences)
-
-
 def get_all_sentences(collection):
     """Return (documents, metadatas, ids) for everything in Chroma."""
     result = collection.get(include=["documents", "metadatas"])
@@ -939,41 +919,3 @@ if how_visible:
                 st.caption(a)
 
 
-# ==================== Manage database ====================
-
-with st.expander("Manage database", expanded=False):
-    st.markdown("Load, add or reset sentences in the vector database.")
-    col_load, col_reset, col_add = st.columns(3)
-
-    with col_load:
-        if st.button("Load sample sentences", key="load_samples", use_container_width=True):
-            n = load_samples_into_chroma(collection, model)
-            st.success(f"Loaded/updated {n} sample sentences.")
-            st.rerun()
-
-    with col_reset:
-        if st.button("Reset database", key="reset_db", use_container_width=True):
-            n = reset_database(collection, model)
-            # Shown outside the expander so it stays visible after the rerun.
-            st.session_state.reset_msg = f"Deleted everything and reloaded {n} sample sentences."
-            st.rerun()
-
-    with col_add:
-        new_text = st.text_area(
-            "Add your sentences (one per line)",
-            placeholder="I love pizza.\nPython is great.",
-            key="add_sentences",
-            height=90,
-        )
-        if st.button("Add to database", key="add_to_db", use_container_width=True):
-            n = add_user_sentences(collection, model, new_text.splitlines())
-            if n:
-                st.success(f"Added {n} sentence(s).")
-                st.rerun()
-            else:
-                st.warning("No sentences to add.")
-
-# Feedback for the database reset, shown outside the expander.
-_reset_msg = st.session_state.pop("reset_msg", None)
-if _reset_msg:
-    st.success(_reset_msg)
